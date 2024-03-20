@@ -13,7 +13,7 @@ authors = "p-98"
 -- langversion
 
 -- packages to add to search path
--- depends =
+depends = sop
 
 -- modules to install
 modules = NameResolution
