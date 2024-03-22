@@ -1,10 +1,10 @@
-[custom.all.idris-project]
+[custom.all.name-resolution]
 type = "local"
 path = "."
-ipkg = "idris-project.ipkg"
+ipkg = "name-resolution.ipkg"
 test = "test/test.ipkg"
 
-[custom.all.idris-project-test]
+[custom.all.name-resolution-test]
 type = "local"
 path = "test"
 ipkg = "test.ipkg"

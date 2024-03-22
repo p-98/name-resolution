@@ -1,4 +1,4 @@
-package idris-project
+package name-resolution
 version = 0.1.0
 authors = "p-98"
 -- maintainers =
