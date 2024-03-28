@@ -1,5 +1,7 @@
 module NameResolution
 
+import Control.App
+import Control.App.Console
 import Control.Monad.Error.Either
 import Control.Monad.Error.Interface
 import Control.Monad.Identity
@@ -43,6 +45,11 @@ namespace Helpers
   decEqToEq x y with (decEq x y)
     decEqToEq x y | Yes _ = True
     decEqToEq x y | No _  = False
+
+  public export
+  whenLeft : Applicative f => Either a b -> (a -> f ()) -> f ()
+  whenLeft (Left x) a = a x
+  whenLeft (Right _) _ = pure ()
 
 Identifier = String
 
@@ -174,6 +181,8 @@ namespace Resolved
   public export
   example2 : Expression 0
   example2 = Let (Literal $ VInt 1) (Equals (Return (Variable 0)) (Let (Variable 0) (Plus (Variable 0) (Variable 1))))
+  -- comment the above line and uncomment the below line to see some tests failing (below is a modified version of the above)
+  -- example2 = Let (Literal $ VInt 1) (Equals (Return (Literal $ VBool False)) (Let (Variable 0) (Plus (Variable 0) (Variable 1))))
 
 namespace Checked
   public export
@@ -355,6 +364,8 @@ namespace Test
   public export
   Assertion : Type
   Assertion = EitherT TestErr Identity ()
+  runAssertion : Assertion -> Either TestErr ()
+  runAssertion = runIdentity . runEitherT
 
   public export
   assertFailure : (msg: String) -> Assertion
@@ -369,7 +380,7 @@ namespace Test
       throwError $ AssertionErr $ msg
     where
       msg : String
-      msg = preface ++ "\n"
+      msg = (if null preface then "" else preface ++ "\n")
          ++ "expected: " ++ show expected ++ "\n"
          ++ " but got: " ++ show actual
 
@@ -411,13 +422,19 @@ namespace Test
   (~:) : Testable t => String -> t -> Test
   label ~: t = TestLabel label $ test t
 
-  runTest' : (labelStack: List String) -> Test -> IO ()
+  summaryMsg : (tried: Integer) -> (failures: Integer) -> String
+  summaryMsg tried failures = "Tried: " ++ show tried ++ "  Failures: " ++ show failures ++ "\n"
+  AssertionErrMsg : (msg: String) -> (stackTrace: String) -> String
+  AssertionErrMsg msg stackTrace = "### AssertionErr in " ++ stackTrace ++ "\n" ++ msg ++ "\n"
+
+  data Tried : Type where
+  data Failures : Type where
+  runTest' : Has [Console, State Tried Integer, State Failures Integer] es => (labelStack: List String) -> Test -> App es ()
   runTest' labelStack (TestCase ass) = do
-    case runIdentity $ runEitherT ass of
-         (Left (AssertionErr msg)) => do
-           putStrLn $ "AssertionError: " ++ msg
-           putStrLn $ "@" ++ showStack labelStack
-         (Right ()) => pure ()
+    whenLeft (runAssertion ass) $ \(AssertionErr msg) => do
+      putStr $ AssertionErrMsg msg (showStack labelStack)
+      modify Failures (+1)
+    modify Tried (+1)
     where
       showStack : List String -> String
       showStack = joinBy "/" . reverse
@@ -428,7 +445,10 @@ namespace Test
 
   public export
   runTest : Test -> IO ()
-  runTest = runTest' []
+  runTest t = run $ new {tag=Tried} 0 $ new {tag=Failures} 0 $ do
+    runTest' [] t
+    putStr =<< summaryMsg <$> (get Tried) <*> (get Failures)
+
 
 ||| Type of an example
 |||
@@ -468,4 +488,4 @@ interpretTests = "interpret" ~: flip map examples
     interpret [] checked @?= v
 
 tests : Test
-tests = TestList [resolveTests, checkTests, checkAllTests, interpretTests]
+tests = TestList [ resolveTests, checkTests, checkAllTests, interpretTests ]
