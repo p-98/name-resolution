@@ -97,6 +97,9 @@ namespace Core
 
 namespace Source
 
+  ||| Source expressions
+  |||
+  ||| Variables are names. No guarantees can be made.
   public export
   data Expression : Type where
     Variable : (name: String) -> Expression
@@ -105,9 +108,7 @@ namespace Source
     Plus : (expr1: Expression) -> (expr2: Expression) -> Expression
     Let : (name: String) -> (assig: Expression) -> Expression -> Expression
     Return : Expression -> Expression
-    -- TODO more expresions
   %name Source.Expression expr, expr1, expr2
-  -- %runElab derive "Expression" [Generic, Meta, Eq, Show]
   public export
   Show Expression where
     show (Variable name) = "Variable " ++ name
@@ -141,15 +142,18 @@ namespace Source
 
 namespace Resolved
 
+  ||| Resolved expressions
+  |||
+  ||| Variables are De Bruijn indices. Guaranteed to reference a variable, since Fin is used.
+  ||| @n the number of variables in the context of the expession
   public export
-  data Expression : Nat -> Type where
+  data Expression : (n: Nat) -> Type where
     Variable : (i: Fin n) -> Expression n
     Literal : Value t -> Expression n
     Equals : (expr1: Expression n) -> (expr2: Expression n) -> Expression n
     Plus : (expr1: Expression n) -> (expr2: Expression n) -> Expression n
     Let : (assig: Expression n) -> (expr: Expression (S n)) -> Expression n
     Return : Expression n -> Expression n
-    -- TODO more expresions
   %name Resolved.Expression expr, expr1, expr2
   public export
   Show (Expression n) where
@@ -185,8 +189,14 @@ namespace Resolved
   -- example2 = Let (Literal $ VInt 1) (Equals (Return (Literal $ VBool False)) (Let (Variable 0) (Plus (Variable 0) (Variable 1))))
 
 namespace Checked
+
+  ||| Checked expressions
+  |||
+  ||| Variables are proofs containing the type. Guaranteed to interpret without errors.
+  ||| @ts the types of the variables in the context of the expression
+  ||| @t the type the expression evaluates to
   public export
-  data Expression : Vect n Tyqe -> Tyqe -> Type where
+  data Expression : (ts: Vect n Tyqe) -> (t: Tyqe) -> Type where
     Variable : {t: _} -> (elem: Elem t ts) -> Expression ts t
     Literal : Value t -> Expression ts t
     Equals : (expr1: Expression ts TInt) -> (expr2: Expression ts TInt) -> Expression ts TBool
@@ -228,9 +238,10 @@ namespace Checked
   example2 : Expression [] TBool
   example2 = Let (Literal $ VInt 1) (Equals (Return (Variable Here)) (Let (Variable Here) (Plus (Variable Here) (Variable $ There Here))))
 
-||| Convert source epxression to de bruijin expressions
+||| Convert source epxression to resolved expression.
 |||
-||| @n number of currently available variables in the expression
+||| Checks names exist and creates De Bruijn indices.
+||| @names the names of currently available variable names in the expression
 resolve : Source.Expression -> (names: Vect n String) -> Maybe (Resolved.Expression n)
 resolve (Variable name) names = do
   let Yes prf = isElem name names
@@ -253,6 +264,11 @@ resolve (Return expr) names = do
   expr' <- resolve expr names
   Just $ Return expr'
 
+
+||| Convert resolved expression to checked expression
+|||
+||| Checks types are correct and creates proofs containing the type of variables.
+||| @ts the types of currently available variables in the expression
 check : Resolved.Expression n -> (ts: Vect n Tyqe) -> Maybe (t ** Checked.Expression ts t)
 check (Variable i) ts = do
   let (t ** elem) = indexElem i ts
@@ -280,9 +296,16 @@ check (Return expr) ts = do
   (t ** expr') <- check expr ts
   Just (t ** Return expr')
 
+
+||| Extract types from map of variable names to types
 types : Vect n (String, Tyqe) -> Vect n Tyqe
 types = map snd
 
+||| Convert source expression to checked expression
+|||
+||| Checks variable names exist and types are correct. Creates proofs containing the type of variables.
+||| Need to use `types` helper because in types only functions with arity 1 work.
+||| @vars the map of variable names to their types currently available in the expression
 checkAll : Source.Expression -> (vars: Vect n (String, Tyqe)) -> Maybe (t ** Checked.Expression (types vars) t)
 checkAll (Variable name) vars = do
   let (ts ** mapPrf) = mapWithProof snd vars
@@ -314,17 +337,20 @@ checkAll (Return expr) vars = do
   (t ** expr') <- checkAll expr vars
   Just (t ** Return expr')
 
+
+||| Extract types from map of variables to their types and values
 envTypes : Vect n (t: Tyqe ** Value t) -> Vect n Tyqe
 envTypes = map fst
 
+||| Get the value of an variable by the proof on the variable type
 getEnvValue : (env : Vect n (t : Tyqe ** Value t)) -> Elem t (envTypes env) -> Value t
 getEnvValue ((t**v)::env) Here          = v
 getEnvValue (_     ::env) (There later) = getEnvValue env later
 
-||| Interpret a checked expression
+||| Interpret checked expression
 |||
-||| @env the environment (values of variables) the expression is interpretet it
-||| @expr the expression to interpret
+||| Cannot fail because checked expressions guarantee formal correctness of the program.
+||| @env the environment (map of variables to their type and value) currently available in the expression
 |||
 ||| Even though using a seperate Env type like this
 ||| > data Env : Vect n Tpe -> Type where
@@ -334,10 +360,10 @@ getEnvValue (_     ::env) (There later) = getEnvValue env later
 ||| to express the relations properly without introducing an extra type.
 |||
 ||| Turns out it is indeed possible and I found the following to be noteworthy:
-|||   - In getEnvValue idris could not autocomplete anything (Not even caseSplit on env/elem or find the recursive call!).
+|||   - In getEnvValue idris could not autocomplete anything (not even caseSplit on env/elem or find the recursive call!).
 |||     But if you write everything down Idris can unify and prove it.
-|||   - If you write `map fst env` instead of `envTypes env` idris interprets fst as implicit variable.
-|||     So a new helper function only taking the variables has to be introduced
+|||   - If you write `map fst env` instead of `envTypes env` idris interprets fst as implicit type variable.
+|||     So a new helper function with arity one has to be introduced
 interpret : (env: Vect n (t: Tyqe ** Value t)) -> Expression (envTypes env) t -> Value t
 interpret env (Variable elem) = getEnvValue env elem
 interpret env (Literal v) = v
@@ -354,6 +380,14 @@ interpret env (Let {tassig} assig expr) = do
   interpret ((tassig ** vassig)::env) expr
 interpret env (Return expr) = interpret env expr
 
+||| Testing library
+|||
+||| This is essentially a port of HUnit to Idris2.
+||| Some interesting modifications:
+|||   - Assertion type uses the exception monad instead of IO,
+|||     since in idris errors thrown in IO cannot be catched!
+|||   - runTests' uses the new App type introduced by idris
+|||     to simplify state and error handling.
 namespace Test
 
   public export
