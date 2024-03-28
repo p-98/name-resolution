@@ -507,15 +507,16 @@ checkTests = "check" ~: flip map examples
   \(t ** (label, v, source, resolved, checked)) => label ~: do
     let Just (t' ** checked') = check [] resolved
       | Nothing => assertFailure "check returned Nothing."
-    case decEq t t' of
-         Yes Refl => checked' @?= checked
-         No _ => assertFailure "check resturned wrong type"
+    let Yes Refl = decEq t t'
+      | No _ => assertFailure "check returned wrong type"
+    checked' @?= checked
 checkAllTests = "checkAll" ~: flip map examples
   \(t ** (label, v, source, resolved, checked)) => label ~: do
-    let Just (t'' ** checked'') = checkAll [] source | Nothing => assertFailure "checkAll returned Nothing."
-    case decEq t t'' of
-         Yes Refl => checked'' @?= checked
-         No _ => assertFailure "checkAll returned wrong type"
+    let Just (t' ** checked') = checkAll [] source
+      | Nothing => assertFailure "checkAll returned Nothing."
+    let Yes Refl = decEq t t'
+      | No _ => assertFailure "checkAll returned wrong type"
+    checked' @?= checked
 interpretTests = "interpret" ~: flip map examples
   \(t ** (label, v, source, resolved, checked)) => label ~: do
     interpret [] checked @?= v
