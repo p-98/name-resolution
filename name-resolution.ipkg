@@ -4,7 +4,7 @@ authors = "p-98"
 -- maintainers =
 -- license =
 -- brief =
--- readme =
+readme = "README.md"
 -- homepage =
 -- sourceloc =
 -- bugtracker =
@@ -13,7 +13,7 @@ authors = "p-98"
 -- langversion
 
 -- packages to add to search path
-depends = sop
+-- depends =
 
 -- modules to install
 modules = NameResolution

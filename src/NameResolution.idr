@@ -14,21 +14,8 @@ import Data.Vect
 import Data.Vect.Elem
 import Debug.Trace
 import Decidable.Equality
--- import Generics.Derive
 
--- %language ElabReflection
-
--- Convert a language with names to use De Bruijn indices
-
-{- In welche Richtung?
-
-  Entweder proof oder Viele Expressions?
-  Functions?
-  Unterschiedliche Typen?
-
-  Allgemein: Was ist der Erwartungshorizont für eine gute und eine sehr gute Note?
-             Wie weit bin ich?
--}
+{- Convert a language with names to use De Bruijn indices -}
 
 namespace Helpers
 
@@ -55,6 +42,7 @@ Identifier = String
 
 namespace Core
 
+  ||| Type in the expression language
   public export
   data Tyqe : Type where
     TInt : Tyqe
@@ -71,6 +59,7 @@ namespace Core
     decEq TInt TBool = No uninhabited
     decEq TBool TBool = Yes Refl
 
+  ||| Value in the expression language
   public export
   data Value : Tyqe -> Type where
     VInt : Integer -> Value TInt
@@ -90,6 +79,7 @@ namespace Core
   Eq (Value t) where
     (==) = decEqToEq
 
+  ||| Get the type of a value
   public export
   vtype : Value t -> (t' ** t' = t)
   vtype (VInt i) = (TInt ** Refl)
@@ -498,26 +488,27 @@ examples =
   , (TBool ** ("example2", VBool True, example2, example2, example2))
   ]
 
-resolveTests = "resolve" ~: flip map examples
+{- The HUnit port features everything needed to write HUnit-style tests: -}
+resolveTests = "resolve" ~: flip map examples $
   \(t ** (label, v, source, resolved, checked)) => label ~: do
     let Just (resolved') = resolve [] source
       | Nothing => assertFailure "resolve returned Nothing."
     resolved' @?= resolved
-checkTests = "check" ~: flip map examples
+checkTests = "check" ~: flip map examples $
   \(t ** (label, v, source, resolved, checked)) => label ~: do
     let Just (t' ** checked') = check [] resolved
       | Nothing => assertFailure "check returned Nothing."
     let Yes Refl = decEq t t'
       | No _ => assertFailure "check returned wrong type"
     checked' @?= checked
-checkAllTests = "checkAll" ~: flip map examples
+checkAllTests = "checkAll" ~: flip map examples $
   \(t ** (label, v, source, resolved, checked)) => label ~: do
     let Just (t' ** checked') = checkAll [] source
       | Nothing => assertFailure "checkAll returned Nothing."
     let Yes Refl = decEq t t'
       | No _ => assertFailure "checkAll returned wrong type"
     checked' @?= checked
-interpretTests = "interpret" ~: flip map examples
+interpretTests = "interpret" ~: flip map examples $
   \(t ** (label, v, source, resolved, checked)) => label ~: do
     interpret [] checked @?= v
 
