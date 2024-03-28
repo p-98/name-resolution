@@ -1,6 +1,6 @@
 # Nameresolution to De Bruijn indices
 
-The project provides an example of practical uses of dependent types.
+This project provides an example of practical uses of dependent types.
 They are used to create a simple expression language that cannot fail during evaluation because the guarantees that all referenced variables exist and have the correct type are enforced by the AST.
 
 ## Structure
@@ -27,10 +27,43 @@ All contents are in `src/NameResolution.idr`. The important elements:
 - interpret
 - namespace Test
   - HUnit port
-- type Example
 - examples
 - tests
   - resolveTests
   - checkTests
   - checkAllTests
   - interpretTests
+
+## Usage
+
+Open the repl in the `NameResolution` module:
+
+```Shell
+pack repl src/NameResolution.idr
+```
+
+To run Tests:
+
+```Idris
+:exec runTest tests
+```
+
+To resolve/check/resolve & check/interpret an expression:
+
+```Idris
+resolve [] $ <Source.Expression>
+```
+
+```Idris
+check [] $ <Resolved.Expression>
+```
+
+```Idris
+checkAll [] $ <Source.Expression>
+```
+
+```Idris
+interpret [] $ <Checked.Expression>
+```
+
+There are three example expressions `example0`, `example1`, `example2` available in every variant.
