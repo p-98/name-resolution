@@ -1,12 +1,12 @@
 package name-resolution
-version = 0.1.0
+version = 1.0.0
 authors = "p-98"
 -- maintainers =
--- license =
+license = "BSD-3-Clause"
 -- brief =
 readme = "README.md"
--- homepage =
--- sourceloc =
+homepage = "https://github.com/p-98/name-resolution"
+sourceloc = "https://github.com/p-98/name-resolution.git"
 -- bugtracker =
 
 -- the Idris2 version required (e.g. langversion >= 0.5.1)

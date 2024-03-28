@@ -1,2 +1,8 @@
 build/
 *.*~
+
+# macOS
+.DS_Store
+
+# nvim
+*.nvim

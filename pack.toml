@@ -2,9 +2,3 @@
 type = "local"
 path = "."
 ipkg = "name-resolution.ipkg"
-test = "test/test.ipkg"
-
-[custom.all.name-resolution-test]
-type = "local"
-path = "test"
-ipkg = "test.ipkg"
