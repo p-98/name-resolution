@@ -242,26 +242,26 @@ namespace Checked
 |||
 ||| Checks names exist and creates De Bruijn indices.
 ||| @names the names of currently available variable names in the expression
-resolve : Source.Expression -> (names: Vect n String) -> Maybe (Resolved.Expression n)
-resolve (Variable name) names = do
+resolve : (names: Vect n String) -> Source.Expression -> Maybe (Resolved.Expression n)
+resolve names (Variable name) = do
   let Yes prf = isElem name names
     | No _ => Nothing
   Just $ Variable (elemToFin prf)
-resolve (Literal v) names = Just $ Literal v
-resolve (Equals expr1 expr2) names = do
-  expr1' <- resolve expr1 names
-  expr2' <- resolve expr2 names
+resolve names (Literal v) = Just $ Literal v
+resolve names (Equals expr1 expr2) = do
+  expr1' <- resolve names expr1
+  expr2' <- resolve names expr2
   Just $ Equals expr1' expr2'
-resolve (Plus expr1 expr2) names = do
-  expr1' <- resolve expr1 names
-  expr2' <- resolve expr2 names
+resolve names (Plus expr1 expr2) = do
+  expr1' <- resolve names expr1
+  expr2' <- resolve names expr2
   Just $ Plus expr1' expr2'
-resolve (Let name assig expr) names = do
-  assig' <- resolve assig names
-  expr' <- resolve expr (name::names)
+resolve names (Let name assig expr) = do
+  assig' <- resolve names assig
+  expr' <- resolve (name::names) expr
   Just $ Let assig' expr'
-resolve (Return expr) names = do
-  expr' <- resolve expr names
+resolve names (Return expr) = do
+  expr' <- resolve names expr
   Just $ Return expr'
 
 
@@ -269,31 +269,31 @@ resolve (Return expr) names = do
 |||
 ||| Checks types are correct and creates proofs containing the type of variables.
 ||| @ts the types of currently available variables in the expression
-check : Resolved.Expression n -> (ts: Vect n Tyqe) -> Maybe (t ** Checked.Expression ts t)
-check (Variable i) ts = do
+check : (ts: Vect n Tyqe) -> Resolved.Expression n -> Maybe (t ** Checked.Expression ts t)
+check ts (Variable i) = do
   let (t ** elem) = indexElem i ts
   Just (t ** Variable elem)
-check (Literal v) ts = do
+check ts (Literal v) = do
   let (t ** Refl) = vtype v
   Just (t ** Literal v)
-check (Equals expr1 expr2) ts = do
-  (t1 ** expr1') <- check expr1 ts
-  (t2 ** expr2') <- check expr2 ts
+check ts (Equals expr1 expr2) = do
+  (t1 ** expr1') <- check ts expr1
+  (t2 ** expr2') <- check ts expr2
   let Yes Refl = decEq (t1, t2) (TInt, TInt)
     | No _ => Nothing
   Just (TBool ** Equals expr1' expr2')
-check (Plus expr1 expr2) ts = do
-  (t1 ** expr1') <- check expr1 ts
-  (t2 ** expr2') <- check expr2 ts
+check ts (Plus expr1 expr2) = do
+  (t1 ** expr1') <- check ts expr1
+  (t2 ** expr2') <- check ts expr2
   let Yes Refl = decEq (t1, t2) (TInt, TInt)
     | No _ => Nothing
   Just (TInt ** Plus expr1' expr2')
-check (Let assig expr) ts = do
-  (tassig ** assig') <- check assig ts
-  (texpr ** expr') <- check expr $ tassig::ts
+check ts (Let assig expr) = do
+  (tassig ** assig') <- check ts assig
+  (texpr ** expr') <- check (tassig::ts) expr
   Just $ (texpr ** Let assig' expr')
-check (Return expr) ts = do
-  (t ** expr') <- check expr ts
+check ts (Return expr) = do
+  (t ** expr') <- check ts expr
   Just (t ** Return expr')
 
 
@@ -306,35 +306,35 @@ types = map snd
 ||| Checks variable names exist and types are correct. Creates proofs containing the type of variables.
 ||| Need to use `types` helper because in types only functions with arity 1 work.
 ||| @vars the map of variable names to their types currently available in the expression
-checkAll : Source.Expression -> (vars: Vect n (String, Tyqe)) -> Maybe (t ** Checked.Expression (types vars) t)
-checkAll (Variable name) vars = do
+checkAll : (vars: Vect n (String, Tyqe)) -> Source.Expression -> Maybe (t ** Checked.Expression (types vars) t)
+checkAll vars (Variable name) = do
   let (ts ** mapPrf) = mapWithProof snd vars
   let names = map fst vars
   let Yes prf = isElem name names
     | No _ => Nothing
   let (t ** elem) = indexElem (elemToFin prf) ts
   Just (t ** Variable (rewrite sym mapPrf in elem))
-checkAll (Literal v) vars = do
+checkAll vars (Literal v) = do
   let (t ** Refl) = vtype v
   Just (t ** Literal v)
-checkAll (Equals expr1 expr2) vars = do
-  (t1 ** expr1') <- checkAll expr1 vars
-  (t2 ** expr2') <- checkAll expr2 vars
+checkAll vars (Equals expr1 expr2) = do
+  (t1 ** expr1') <- checkAll vars expr1
+  (t2 ** expr2') <- checkAll vars expr2
   let Yes Refl = decEq (t1, t2) (TInt, TInt)
     | No _ => Nothing
   Just (TBool ** Equals expr1' expr2')
-checkAll (Plus expr1 expr2) vars = do
-  (t1 ** expr1') <- checkAll expr1 vars
-  (t2 ** expr2') <- checkAll expr2 vars
+checkAll vars (Plus expr1 expr2) = do
+  (t1 ** expr1') <- checkAll vars expr1
+  (t2 ** expr2') <- checkAll vars expr2
   let Yes Refl = decEq (t1, t2) (TInt, TInt)
     | No _ => Nothing
   Just (TInt ** Plus expr1' expr2')
-checkAll (Let name assig expr) vars = do
-  (tassig ** assig') <- checkAll assig vars
-  (texpr ** expr') <- checkAll expr $ (name, tassig) :: vars
+checkAll vars (Let name assig expr) = do
+  (tassig ** assig') <- checkAll vars assig
+  (texpr ** expr') <- checkAll ((name, tassig) :: vars) expr
   Just (texpr ** Let assig' expr')
-checkAll (Return expr) vars = do
-  (t ** expr') <- checkAll expr vars
+checkAll vars (Return expr) = do
+  (t ** expr') <- checkAll vars expr
   Just (t ** Return expr')
 
 
@@ -500,19 +500,19 @@ examples =
 
 resolveTests = "resolve" ~: flip map examples
   \(t ** (label, v, source, resolved, checked)) => label ~: do
-    let Just (resolved') = resolve source []
+    let Just (resolved') = resolve [] source
       | Nothing => assertFailure "resolve returned Nothing."
     resolved' @?= resolved
 checkTests = "check" ~: flip map examples
   \(t ** (label, v, source, resolved, checked)) => label ~: do
-    let Just (t' ** checked') = check resolved []
+    let Just (t' ** checked') = check [] resolved
       | Nothing => assertFailure "check returned Nothing."
     case decEq t t' of
          Yes Refl => checked' @?= checked
          No _ => assertFailure "check resturned wrong type"
 checkAllTests = "checkAll" ~: flip map examples
   \(t ** (label, v, source, resolved, checked)) => label ~: do
-    let Just (t'' ** checked'') = checkAll source [] | Nothing => assertFailure "checkAll returned Nothing."
+    let Just (t'' ** checked'') = checkAll [] source | Nothing => assertFailure "checkAll returned Nothing."
     case decEq t t'' of
          Yes Refl => checked'' @?= checked
          No _ => assertFailure "checkAll returned wrong type"
