@@ -37,7 +37,7 @@ namespace Helpers
   mapWithProof f inp = (map f inp ** Refl)
 
   public export
-  implementation Uninhabited (x = y) => Uninhabited (y = x) where
+  Uninhabited (x = y) => Uninhabited (y = x) where
     uninhabited eq = absurd (sym eq)
 
   public export
@@ -109,7 +109,7 @@ namespace Source
   %name Source.Expression expr, expr1, expr2
   -- %runElab derive "Expression" [Generic, Meta, Eq, Show]
   public export
-  implementation Show Expression where
+  Show Expression where
     show (Variable name) = "Variable " ++ name
     show (Literal v) = "Literal " ++ show v
     show (Equals expr1 expr2) = "Equals (" ++ show expr1 ++ ") (" ++ show expr2 ++ ")"
@@ -117,7 +117,7 @@ namespace Source
     show (Let name assig expr) = "Let " ++ name ++ "=(" ++ show assig ++ ") in (" ++ show expr ++ ")"
     show (Return expr) = "Return (" ++ show expr ++ ")"
   public export
-  implementation Eq Expression where
+  Eq Expression where
     (Variable n1) == (Variable n2) = n1 == n2
     (Literal (VInt i1)) == (Literal (VInt i2)) = i1 == i2
     (Literal (VBool x1)) == (Literal (VBool x2)) = x1 == x2
@@ -152,7 +152,7 @@ namespace Resolved
     -- TODO more expresions
   %name Resolved.Expression expr, expr1, expr2
   public export
-  implementation Show (Expression n) where
+  Show (Expression n) where
     show (Variable i) = "Variable " ++ show i
     show (Literal v) = "Literal " ++ show v
     show (Equals expr1 expr2) = "Equals (" ++ show expr1 ++ ") (" ++ show expr2 ++ ")"
@@ -195,7 +195,7 @@ namespace Checked
     Return : Expression ts t -> Expression ts t
   %name Checked.Expression expr, expr1, expr2
   public export
-  implementation Show (Expression ts t) where
+  Show (Expression ts t) where
     show (Variable {t} elem) = "Variable " ++ show (elemToFin elem) ++ ":" ++ show t
     show (Literal v) = "Literal " ++ show v
     show (Equals expr1 expr2) = "Equals (" ++ show expr1 ++ ") (" ++ show expr2 ++ ")"
@@ -233,9 +233,9 @@ namespace Checked
 ||| @n number of currently available variables in the expression
 resolve : Source.Expression -> (names: Vect n String) -> Maybe (Resolved.Expression n)
 resolve (Variable name) names = do
-  case isElem name names of
-       Yes prf => Just $ Variable (elemToFin prf)
-       No _    => Nothing
+  let Yes prf = isElem name names
+    | No _ => Nothing
+  Just $ Variable (elemToFin prf)
 resolve (Literal v) names = Just $ Literal v
 resolve (Equals expr1 expr2) names = do
   expr1' <- resolve expr1 names
@@ -263,15 +263,15 @@ check (Literal v) ts = do
 check (Equals expr1 expr2) ts = do
   (t1 ** expr1') <- check expr1 ts
   (t2 ** expr2') <- check expr2 ts
-  case decEq (t1, t2) (TInt, TInt) of
-       Yes Refl => Just (TBool ** Equals expr1' expr2')
-       No contra => Nothing
+  let Yes Refl = decEq (t1, t2) (TInt, TInt)
+    | No _ => Nothing
+  Just (TBool ** Equals expr1' expr2')
 check (Plus expr1 expr2) ts = do
   (t1 ** expr1') <- check expr1 ts
   (t2 ** expr2') <- check expr2 ts
-  case decEq (t1, t2) (TInt, TInt) of
-       Yes Refl => Just (TInt ** Plus expr1' expr2')
-       No contra => Nothing
+  let Yes Refl = decEq (t1, t2) (TInt, TInt)
+    | No _ => Nothing
+  Just (TInt ** Plus expr1' expr2')
 check (Let assig expr) ts = do
   (tassig ** assig') <- check assig ts
   (texpr ** expr') <- check expr $ tassig::ts
@@ -286,27 +286,26 @@ types = map snd
 checkAll : Source.Expression -> (vars: Vect n (String, Tyqe)) -> Maybe (t ** Checked.Expression (types vars) t)
 checkAll (Variable name) vars = do
   let (ts ** mapPrf) = mapWithProof snd vars
-      ns = map fst vars
-  case isElem name ns of
-       (Yes prf) => do
-         let (t ** myprf) = indexElem (elemToFin prf) ts
-         Just (t ** Variable (rewrite sym mapPrf in myprf))
-       (No contra) => Nothing
+  let names = map fst vars
+  let Yes prf = isElem name names
+    | No _ => Nothing
+  let (t ** elem) = indexElem (elemToFin prf) ts
+  Just (t ** Variable (rewrite sym mapPrf in elem))
 checkAll (Literal v) vars = do
   let (t ** Refl) = vtype v
   Just (t ** Literal v)
 checkAll (Equals expr1 expr2) vars = do
   (t1 ** expr1') <- checkAll expr1 vars
   (t2 ** expr2') <- checkAll expr2 vars
-  case decEq (t1, t2) (TInt, TInt) of
-       (Yes Refl) => Just (TBool ** Equals expr1' expr2')
-       (No contra) => Nothing
+  let Yes Refl = decEq (t1, t2) (TInt, TInt)
+    | No _ => Nothing
+  Just (TBool ** Equals expr1' expr2')
 checkAll (Plus expr1 expr2) vars = do
   (t1 ** expr1') <- checkAll expr1 vars
   (t2 ** expr2') <- checkAll expr2 vars
-  case decEq (t1, t2) (TInt, TInt) of
-       (Yes Refl) => Just (TInt ** Plus expr1' expr2')
-       (No contra) => Nothing
+  let Yes Refl = decEq (t1, t2) (TInt, TInt)
+    | No _ => Nothing
+  Just (TInt ** Plus expr1' expr2')
 checkAll (Let name assig expr) vars = do
   (tassig ** assig') <- checkAll assig vars
   (texpr ** expr') <- checkAll expr $ (name, tassig) :: vars
