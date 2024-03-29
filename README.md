@@ -1,4 +1,4 @@
-# Nameresolution to De Bruijn indices
+# Name Resolution to De Bruijn Indices
 
 This project provides an example of practical uses of dependent types.
 They are used to create a simple expression language that cannot fail during evaluation because the guarantees that all referenced variables exist and have the correct type are enforced by the AST.
